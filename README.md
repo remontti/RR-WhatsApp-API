@@ -14,6 +14,7 @@ Este repositório contém uma API simples para enviar mensagens do WhatsApp util
   - [2. Instalar Dependências do Sistema](#2-instalar-dependências-do-sistema)
   - [3. Clonar o Repositório](#3-clonar-o-repositório)
   - [4. Instalar Dependências do Node.js](#4-instalar-dependências-do-nodejs)
+  - [5. Ajustar Configurações](#5-ajustar-configurações)
 - [Execução](#execução)
   - [Iniciar a Aplicação](#iniciar-a-aplicação)
 - [Uso](#uso)
