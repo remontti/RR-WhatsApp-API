@@ -1,0 +1,89 @@
+zabbix_export:
+  version: '7.0'
+  media_types:
+    - name: WhatsApp-RR
+      type: WEBHOOK
+      parameters:
+        - name: Message
+          value: '{ALERT.SUBJECT} {ALERT.MESSAGE}'
+        - name: Server
+          value: 'http://localhost:3001'
+        - name: To
+          value: '{ALERT.SENDTO}'
+      script: |
+        var request = new HttpRequest();
+        var params = JSON.parse(value); // 'value' contém os parâmetros de entrada do Zabbix
+        
+        var url = params.Server + '/api/send';
+        
+        var postData = {
+            recipients: params.To, // Destinatário (usuário/grupo)
+            message: params.Message // Mensagem do alerta
+        };
+        
+        request.addHeader('Content-Type: application/json');
+        
+        var result = request.post(url, JSON.stringify(postData));
+        
+        if (request.getStatus() !== 200) {
+            throw 'Failed to send WhatsApp message. Status: ' + request.getStatus();
+        }
+        
+        return 'Message sent successfully: ' + result;
+      timeout: 10s
+      process_tags: 'YES'
+      message_templates:
+        - event_source: TRIGGERS
+          operation_mode: PROBLEM
+          subject: '❌ *{HOST.NAME}*'
+          message: |
+            {EVENT.NAME}
+            {ITEM.NAME1} ({ITEM.VALUE1})
+            
+            🔗 {HOST.IP}
+            ℹ️ *{EVENT.SEVERITY}*
+        - event_source: TRIGGERS
+          operation_mode: RECOVERY
+          subject: '✅ *{HOST.NAME}*'
+          message: |
+            
+            {EVENT.NAME}
+            {ITEM.NAME1} ({ITEM.VALUE1})
+            
+            🔗 {HOST.IP}
+            ⏰ Duração: {EVENT.AGE}
+        - event_source: TRIGGERS
+          operation_mode: UPDATE
+          subject: '*{USER.FULLNAME}*:'
+          message: |
+            💬 <i>{EVENT.UPDATE.MESSAGE}</i>
+            
+            🚨 *{HOST.NAME}*
+            ⚠️ {EVENT.NAME}
+            
+            🔗 Host: {HOST.IP}
+            📊 Status atual: *{EVENT.STATUS}* 
+            🔔Reconhecido: *{EVENT.ACK.STATUS}*
+            🔥 Severidade: *{EVENT.SEVERITY}*
+        - event_source: DISCOVERY
+          operation_mode: PROBLEM
+          subject: 'Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}'
+          message: |
+            Discovery rule: {DISCOVERY.RULE.NAME}
+            
+            Device IP: {DISCOVERY.DEVICE.IPADDRESS}
+            Device DNS: {DISCOVERY.DEVICE.DNS}
+            Device status: {DISCOVERY.DEVICE.STATUS}
+            Device uptime: {DISCOVERY.DEVICE.UPTIME}
+            
+            Device service name: {DISCOVERY.SERVICE.NAME}
+            Device service port: {DISCOVERY.SERVICE.PORT}
+            Device service status: {DISCOVERY.SERVICE.STATUS}
+            Device service uptime: {DISCOVERY.SERVICE.UPTIME}
+        - event_source: AUTOREGISTRATION
+          operation_mode: PROBLEM
+          subject: 'Autoregistration: {HOST.HOST}'
+          message: |
+            Host name: {HOST.HOST}
+            Host IP: {HOST.IP}
+            Agent port: {HOST.PORT}
