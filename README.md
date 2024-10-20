@@ -62,7 +62,7 @@ Instale as dependências necessárias para o `puppeteer` e outras bibliotecas:
 
 ```bash
 apt install -y \
-  curl wget nano vim git nodejs npm \
+  curl wget nano vim git nodejs npm psmisc \
   ca-certificates fonts-liberation libappindicator3-1 \
   libatk-bridge2.0-0 libcups2 libdrm-dev libgbm-dev libgtk-3-0 \
   libnspr4 libnss3 libxss1 lsb-release xdg-utils
@@ -319,7 +319,7 @@ Para executar a aplicação como um serviço no Debian 12, siga os passos abaixo
    Restart=always
    User=rr-whatsapp-api
    Environment=NODE_ENV=production
-   ExecReload=/bin/kill -s HUP $MAINPID
+   ExecReload=/usr/bin/killall -9 rr-whatsapp-api
    KillMode=process
    RestartSec=10
    
