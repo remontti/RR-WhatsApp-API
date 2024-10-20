@@ -328,15 +328,15 @@ Para executar a aplicação como um serviço no Debian 12, siga os passos abaixo
 2. **Recarregar o systemd e Iniciar o Serviço**
 
    ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable rr-whatsapp-api.service
-   sudo systemctl start rr-whatsapp-api.service
+   systemctl daemon-reload
+   systemctl enable rr-whatsapp-api.service
+   systemctl start rr-whatsapp-api.service
    ```
 
 3. **Verificar o Status do Serviço**
 
    ```bash
-   sudo systemctl status rr-whatsapp-api.service
+   systemctl status rr-whatsapp-api.service
    ```
 
 ---
