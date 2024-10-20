@@ -72,6 +72,8 @@ Crie um usuário para a aplicação e clone este repositório:
 adduser --home /opt/RR-WhatsApp-API rr-whatsapp-api
 su - rr-whatsapp-api
 git clone https://github.com/remontti/RR-WhatsApp-API.git
+mv /opt/RR-WhatsApp-API/RR-WhatsApp-API/* /opt/RR-WhatsApp-API/
+rm -rf /opt/RR-WhatsApp-API/RR-WhatsApp-API
 ```
 
 ### 4. Instalar Dependências do Node.js
