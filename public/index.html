@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>WhatsApp API</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .card {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #343a40;
+        }
+        .loading {
+            text-align: center;
+            font-size: 1.2em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-9">
+            <div class="card p-4">
+                <h1 class="text-center mb-4">WhatsApp API</h1>
+
+                <!-- Formulário de envio de mensagem e anexo -->
+                <h2>Enviar Mensagem</h2>
+                <form id="messageForm" action="/api/send" method="POST" enctype="multipart/form-data" class="mb-4">
+                    <div class="mb-3">
+                        <label for="recipients" class="form-label">Número(s) ou Grupo(s) (separados por vírgula)</label>
+                        <input type="text" id="recipients" name="recipients" class="form-control" placeholder="Ex: +5511912345678,+5511912345679,Grupo 1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="message" class="form-label">Mensagem</label>
+                        <textarea id="message" name="message" class="form-control" rows="5" placeholder="Digite sua mensagem aqui" required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Selecionar Imagem/Documento (Opcional)</label>
+                        <input type="file" id="file" name="file" class="form-control">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Enviar Mensagem</button>
+                </form>
+
+                <!-- Status de conexão -->
+                <h2 id="connectionStatus" class="text-center">Carregando status...</h2>
+                <div id="connectBtn" class="text-center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para o QR Code -->
+<div class="modal fade" id="qrModal" tabindex="-1" aria-labelledby="qrModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrModalLabel">Conectar ao WhatsApp</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h6>Escaneie o QR Code abaixo:</h6>
+                <div id="qrCodeContainer">
+                    <div class="loading" id="loadingMessage">Carregando QR Code...</div>
+                    <img id="qrCode" src="" alt="QR Code" style="display: none; width: 250px; height: 250px;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para mensagens -->
+<div class="modal fade" id="messageModal" tabindex="-1" aria-labelledby="messageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messageModalLabel">Mensagem</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="messageModalBody">
+                <!-- Conteúdo da mensagem será inserido via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS and Popper.js -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Script para verificar o status da conexão e WebSocket -->
+<script>
+let lastQrCodeData = null;
+let qrModalInstance;
+
+document.addEventListener('DOMContentLoaded', function () {
+    // Verificar status de conexão
+    fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+            const connectionStatus = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            if (data.status === 'connected') {
+                connectionStatus.textContent = `Conectado ao WhatsApp: ${data.number}`;
+                connectBtn.innerHTML = `<button class="btn btn-danger w-100" onclick="disconnect()">Desconectar</button>`;
+            } else {
+                connectionStatus.textContent = 'Não conectado ao WhatsApp';
+                connectBtn.innerHTML = `<button class="btn btn-success w-100" onclick="showQrCode()">Conectar</button>`;
+            }
+        })
+        .catch(err => {
+            console.error('Erro ao verificar o status:', err);
+            document.getElementById('connectionStatus').textContent = 'Erro ao carregar o status';
+        });
+
+    // Configurar WebSocket para receber notificações do servidor
+    const socket = new WebSocket(`ws://${window.location.hostname}:8080`);
+
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (data.type === 'authenticated') {
+            // Fechar o modal e recarregar a página quando o WhatsApp for autenticado
+            if (qrModalInstance) {
+                qrModalInstance.hide();
+            }
+            location.reload();  // Recarregar a página para atualizar o status
+        } else if (data.type === 'qr') {
+            // Armazenar o QR Code recebido
+            lastQrCodeData = data.data;
+
+            // Atualizar o QR Code na página se o modal estiver aberto
+            const qrModal = document.getElementById('qrModal');
+            if (qrModal.classList.contains('show')) {
+                document.getElementById('loadingMessage').style.display = 'none';
+                const qrCode = document.getElementById('qrCode');
+                qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQrCodeData)}`;
+                qrCode.style.display = 'block';
+            }
+        } else if (data.type === 'disconnected') {
+            // Atualizar a UI para refletir a desconexão
+            document.getElementById('connectionStatus').textContent = 'Não conectado ao WhatsApp';
+            document.getElementById('connectBtn').innerHTML = `<button class="btn btn-success w-100" onclick="showQrCode()">Conectar</button>`;
+        }
+    };
+
+    // Manipular o envio do formulário
+    document.getElementById('messageForm').addEventListener('submit', function(event) {
+        event.preventDefault(); // Impedir o envio padrão do formulário
+
+        const form = this;
+        const formData = new FormData(form);
+
+        // Mostrar mensagem de carregamento
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        const originalButtonText = submitButton.textContent;
+        submitButton.textContent = 'Enviando...';
+
+        fetch('/api/send', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+
+            if (data.status === 'success') {
+                // Mostrar modal de sucesso
+                showMessageModal('Sucesso', 'Mensagem enviada com sucesso!', 'success');
+                form.reset(); // Limpar o formulário
+            } else {
+                // Mostrar modal de erro
+                showMessageModal('Erro', 'Erro ao enviar mensagem: ' + data.message, 'danger');
+                if (data.error) {
+                    console.error('Detalhes do erro:', data.error);
+                }
+            }
+        })
+        .catch(err => {
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+            console.error('Erro ao enviar mensagem:', err);
+            // Mostrar modal de erro
+            showMessageModal('Erro', 'Erro ao enviar mensagem.', 'danger');
+        });
+    });
+});
+
+// Função para mostrar o modal de mensagem
+function showMessageModal(title, message, type) {
+    const messageModalLabel = document.getElementById('messageModalLabel');
+    const messageModalBody = document.getElementById('messageModalBody');
+
+    messageModalLabel.textContent = title;
+    messageModalBody.innerHTML = `<div class="alert alert-${type}" role="alert">${message}</div>`;
+
+    var messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
+    messageModal.show();
+}
+
+// Mostrar QR Code no modal
+function showQrCode() {
+    qrModalInstance = new bootstrap.Modal(document.getElementById('qrModal'));
+    qrModalInstance.show();
+
+    // Limpar qualquer QR Code anterior
+    document.getElementById('qrCode').style.display = 'none';
+    document.getElementById('loadingMessage').style.display = 'block';
+
+    // Se já tivermos o QR Code, exibir imediatamente
+    if (lastQrCodeData) {
+        document.getElementById('loadingMessage').style.display = 'none';
+        const qrCode = document.getElementById('qrCode');
+        qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQrCodeData)}`;
+        qrCode.style.display = 'block';
+    }
+}
+
+// Desconectar do WhatsApp
+function disconnect() {
+    fetch('/api/disconnect')
+        .then(() => {
+            // Mostrar modal de desconexão
+            showMessageModal('Desconectado', 'Desconectado com sucesso!', 'warning');
+            // Atualizar a UI após fechar o modal
+            document.getElementById('messageModal').addEventListener('hidden.bs.modal', function () {
+                location.reload();
+            }, { once: true });
+        })
+        .catch(err => {
+            console.error('Erro ao desconectar:', err);
+            showMessageModal('Erro', 'Erro ao desconectar.', 'danger');
+        });
+}
+</script>
+
+</body>
+</html>
