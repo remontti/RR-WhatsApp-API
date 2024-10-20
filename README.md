@@ -1,5 +1,7 @@
 # RR-WhatsApp-API
 
+https://blog.remontti.com.br/8109
+
 Este repositório contém uma API simples para enviar mensagens do WhatsApp utilizando o `whatsapp-web.js`. A API possibilita o envio de mensagens com ou sem anexos, tanto para números individuais quanto para grupos. A aplicação pode ser utilizada via interface web ou diretamente através de endpoints REST.
 
 ## Índice
@@ -159,7 +161,7 @@ Substitua `SEU_SERVIDOR` pelo endereço IP ou nome de domínio do seu servidor.
 - Preencha o formulário:
   - **Número(s) ou Grupo(s):** Insira os números de telefone (com código do país e DDD) ou nomes dos grupos, separados por vírgula. Exemplo:
     ```
-    +5511912345678, +5511987654321, Nome do Grupo
+    +5521999999999, +5511988888888, Nome do Grupo
     ```
   - **Mensagem:** Digite a mensagem que deseja enviar.
   - **Selecionar Imagem/Documento (Opcional):** Se desejar enviar um anexo, selecione o arquivo.
@@ -238,7 +240,7 @@ http://SEU_SERVIDOR:3001/api/send
 
 ```bash
 curl -X POST http://SEU_SERVIDOR:3001/api/send \
-  -F 'recipients=+5511912345678,Grupo de Amigos' \
+  -F 'recipients=+5521999999999,Grupo de Amigos' \
   -F 'message=Olá, esta é uma mensagem de teste!'
 ```
 
@@ -275,7 +277,7 @@ http://SEU_SERVIDOR:3001/api/sendMessage/:recipient/:message
 Enviar "Teste via GET" para o número +55 21 99999-9999:
 
 ```
-http://SEU_SERVIDOR:3001/api/sendMessage/5511912345678/Teste%20via%20GET
+http://SEU_SERVIDOR:3001/api/sendMessage/5521999999999/Teste%20via%20GET
 ```
 
 Enviar "Aviso importante" para o grupo "Equipe":
@@ -351,7 +353,7 @@ Para executar a aplicação como um serviço no Debian 12, siga os passos abaixo
 
 ## Contribuições
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests.
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests. (Se vou responder ou modificar a resposta é provavelmente não.)
 A programação é credito do Chat GTP, pois eu não sei node! Mas nem por isso sou c*zão, de não compartilhar! 
 
 ---
