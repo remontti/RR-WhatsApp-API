@@ -301,7 +301,7 @@ Para executar a aplicação como um serviço no Debian 12, siga os passos abaixo
 1. **Criar o Arquivo de Unidade**
 
    ```bash
-   sudo nano /etc/systemd/system/rr-whatsapp-api.service
+   nano /etc/systemd/system/rr-whatsapp-api.service
    ```
 
    **Conteúdo do Arquivo:**
