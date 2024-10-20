@@ -1,7 +1,3 @@
-Sua documentação está bem organizada e clara. Fiz algumas pequenas correções de formatação e sugestões para melhorar a clareza e o fluxo. Aqui está a versão revisada:
-
----
-
 # RR-WhatsApp-API
 
 Este repositório contém uma API simples para enviar mensagens do WhatsApp utilizando o `whatsapp-web.js`. A API possibilita o envio de mensagens com ou sem anexos, tanto para números individuais quanto para grupos. A aplicação pode ser utilizada via interface web ou diretamente através de endpoints REST.
@@ -354,6 +350,7 @@ Para executar a aplicação como um serviço no Debian 12, siga os passos abaixo
 ## Contribuições
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests.
+A programação é credito do Chat GTP, pois eu não sei node! Mas nem por isso sou c*zão, de não compartilhar! 
 
 ---
 
