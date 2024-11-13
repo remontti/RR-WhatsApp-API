@@ -249,22 +249,31 @@ app.post('/api/send', async (req, res) => {
         };
 
         const chats = await client.getChats();
-        for (const recipient of recipientList) {
-            const recipientTrimmed = recipient.trim();
-            if (recipientTrimmed.startsWith('+')) {
-                const number = recipientTrimmed.replace(/\D/g, '');
-                const chatId = number + "@c.us";
-                await sendMessageWithTimeout(chatId, message, file);
-            } else {
-                const group = chats.find(chat => chat.isGroup && chat.name === recipientTrimmed);
-                if (group) {
-                    await sendMessageWithTimeout(group.id._serialized, message, file);
-                } else {
-                    console.error(`Grupo ${recipientTrimmed} não encontrado.`);
-                }
-            }
-        }
+		for (const recipient of recipientList) {
+			const recipientTrimmed = recipient.trim();
 
+			// Verifica se o destinatário é um número de celular
+			if (/^\+?\d+$/.test(recipientTrimmed)) {
+				let number = recipientTrimmed.replace(/\D/g, ''); // Remove todos os caracteres não numéricos
+
+				// Remove o nono dígito, caso seja um celular brasileiro com 11 dígitos (ex.: 55 + 11 + número com 9 dígitos)
+				if (number.startsWith("55") && number.length === 13) {
+					number = number.slice(0, 4) + number.slice(5); // Remove o nono dígito
+				}
+				
+				const chatId = number + "@c.us";
+				await sendMessageWithTimeout(chatId, message, file);
+			} else {
+				// Envia para grupos usando o nome exato do grupo
+				const group = chats.find(chat => chat.isGroup && chat.name === recipientTrimmed);
+				if (group) {
+					await sendMessageWithTimeout(group.id._serialized, message, file);
+				} else {
+					console.error(`Grupo ${recipientTrimmed} não encontrado.`);
+				}
+			}
+		}
+		
         res.status(200).json({ status: 'success', message: 'Mensagem enviada!' });
     } catch (err) {
         console.error('Erro ao processar o envio:', err);
