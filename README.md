@@ -59,11 +59,12 @@ apt update ; apt upgrade -y
 Instale as dependências necessárias para o `puppeteer` e outras bibliotecas:
 
 ```bash
-apt install -y \
+# apt install -y \
   curl wget nano vim git nodejs npm psmisc \
   ca-certificates fonts-liberation libappindicator3-1 \
   libatk-bridge2.0-0 libcups2 libdrm-dev libgbm-dev libgtk-3-0 \
-  libnspr4 libnss3 libxss1 lsb-release xdg-utils
+  libnspr4 libnss3 libxss1 lsb-release xdg-utils libasound2 libdrm2 \
+  libxcomposite1 libxrandr2 libgbm1
 ```
 
 ### 3. Clonar o Repositório
