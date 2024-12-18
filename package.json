@@ -11,7 +11,7 @@
     "dependencies": {
       "express": "^4.18.2",
       "express-fileupload": "^1.4.0",
-      "whatsapp-web.js": "^1.18.4",
+      "whatsapp-web.js": "1.26.1-alpha.3",
       "ws": "^8.13.0",
       "qrcode": "^1.5.1",
       "ip-range-check": "^0.2.0"
