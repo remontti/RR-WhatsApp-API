@@ -11,6 +11,8 @@ const app = express();
 const port = 3001;
 
 const allowedIPs = [
+//    '0.0.0.0/0',
+    '10.0.0.0/8',
     '192.168.0.0/16',
     '127.0.0.1',
     '::1',
@@ -316,30 +318,36 @@ app.post('/api/send', async (req, res) => {
         for (const recipient of recipientList) {
             const recipientTrimmed = recipient.trim();
 
-            // Verifica se o destinatário é um número de celular
-            if (/^\+?\d+$/.test(recipientTrimmed)) {
-                let number = recipientTrimmed.replace(/\D/g, ''); // Remove todos os caracteres não numéricos
+        // Verifica se o destinatário é um número de celular
+        if (/^\+?\d+$/.test(recipientTrimmed)) {
+            // Remove todos os caracteres não numéricos (espaços, +, parênteses, etc.)
+            let number = recipientTrimmed.replace(/\D/g, '');
 
-                // Remove o nono dígito, caso seja um celular brasileiro com 11 dígitos (ex.: 55 + 11 + número com 9 dígitos)
-                if (number.startsWith("55") && number.length === 13) {
-                    number = number.slice(0, 4) + number.slice(5); // Remove o nono dígito
-                }
-                
-                const chatId = number + "@c.us";
-                await sendMessageWithTimeout(chatId, message, file);
+            // 1) Envio sem remover o dígito
+            const chatIdSemRemover = number + "@c.us";
+            await sendMessageWithTimeout(chatIdSemRemover, message, file);
 
-            } else {
-                // Envia para grupos usando o nome exato do grupo
-                const group = chats.find(chat => chat.isGroup && chat.name === recipientTrimmed);
-                if (group) {
-                    await sendMessageWithTimeout(group.id._serialized, message, file);
-                } else {
-                    console.error(`Grupo ${recipientTrimmed} não encontrado.`);
-                }
+            // 2) Se for um celular brasileiro com 13 dígitos, remove o dígito na posição 4
+            if (number.startsWith("55") && number.length === 13) {
+                number = number.slice(0, 4) + number.slice(5);
             }
 
-            // Delay de 5 segundos entre os envios para evitar bloqueio
-            await delay(5000); // Delay de 5 segundos (pode ajustar conforme necessário)
+            // 3) Envio com o dígito removido (se for o caso)
+            const chatIdComRemover = number + "@c.us";
+            await sendMessageWithTimeout(chatIdComRemover, message, file);
+
+        } else {
+            // Envia para grupos usando o nome exato do grupo
+            const group = chats.find(chat => chat.isGroup && chat.name === recipientTrimmed);
+            if (group) {
+                await sendMessageWithTimeout(group.id._serialized, message, file);
+            } else {
+                console.error(`Grupo ${recipientTrimmed} não encontrado.`);
+            }
+        }
+
+        // Delay de 5 segundos entre os envios para evitar bloqueio (pode ajustar conforme necessário)
+        await delay(5000);
         }
         
         res.status(200).json({ status: 'success', message: 'Mensagem enviada!' });
