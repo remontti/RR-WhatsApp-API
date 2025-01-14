@@ -117,6 +117,42 @@ function registerClientEvents() {
     client.on('loading_screen', (percent, message) => {
         console.log(`Carregando (${percent}%): ${message}`);
     });
+/*	
+    // Adicione este evento para autoresponder mensagens
+    client.on('message', async (msg) => {
+        console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
+        
+        // Verifique se a mensagem é de texto
+        if (msg.type === 'chat') {
+            const response = `Olá, recebi sua mensagem: "${msg.body}". Vou te responder em breve.`;
+            await client.sendMessage(msg.from, response);
+            console.log(`Resposta automática enviada para ${msg.from}`);
+        }
+    });
+*/	
+	// Adicione este evento para mensagem de testes
+	client.on('message', async (msg) => {
+		console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
+		
+		// Verifique se a mensagem é de texto
+		if (msg.type === 'chat' && msg.body.toLowerCase().trim() === '!ping') {
+			const response = 'PONG';
+			await client.sendMessage(msg.from, response);
+			console.log(`Resposta automática enviada para ${msg.from}`);
+		}
+	});
+
+	// Adicione este evento para recusar chamadas e responder
+	client.on('call', async (call) => {
+		console.log(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
+
+			await call.reject();
+			console.log('Videochamada rejeitada.');
+			const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
+			await client.sendMessage(call.from, message);
+			console.log(`Mensagem automática enviada para ${call.from}`);
+	});
+
 }
 
 createClient();
@@ -195,6 +231,64 @@ app.get('/api/status', async (req, res) => {
     }
 });
 
+const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) => {
+    return new Promise(async (resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error('Timeout ao enviar mensagem.'));
+        }, timeout);
+
+        try {
+			// Verifica se a mensagem contém um link de imagem no formato [img = https://linkdaimagem]
+            const imageRegex = /\[img\s*=\s*(https?:\/\/[^\s]+)\]/i;
+            const pdfRegex = /\[pdf\s*=\s*(https?:\/\/[^\s]+)\]/i;  // Regex para detectar link de PDF
+
+            let match = message.match(imageRegex);
+            if (match) {
+                const imageUrl = match[1];
+                const media = await MessageMedia.fromUrl(imageUrl);  // Baixa a imagem usando o URL
+
+                // Envia a imagem
+                await client.sendMessage(chatId, media, { caption: message.replace(imageRegex, '') });
+                console.log(`Imagem com a mensagem enviada para ${chatId}`);
+            } else {
+                match = message.match(pdfRegex);  // Verifica se é um link de PDF
+                if (match) {
+                    const pdfUrl = match[1];
+                    const media = await MessageMedia.fromUrl(pdfUrl);  // Baixa o PDF
+
+                    // Envia o PDF
+                    await client.sendMessage(chatId, media, { caption: message.replace(pdfRegex, '') });
+                    console.log(`PDF com a mensagem enviado para ${chatId}`);
+                } else {
+                    // Caso não haja imagem ou PDF, apenas envia a mensagem de texto
+                    if (file) {
+                        const filePath = path.join('/tmp', file.name);
+                        await file.mv(filePath);
+                        const media = MessageMedia.fromFilePath(filePath);
+                        await client.sendMessage(chatId, media, { caption: message });
+                        console.log(`Mensagem com anexo enviada para ${chatId}`);
+                        fs.unlink(filePath, (err) => {
+                            if (err) console.error(`Erro ao remover o arquivo: ${filePath}`, err);
+                        });
+                    } else {
+                        await client.sendMessage(chatId, message);
+                        console.log(`Mensagem enviada para ${chatId}`);
+                    }
+                }
+            }
+
+            clearTimeout(timeoutId);
+            resolve();
+        } catch (err) {
+            clearTimeout(timeoutId);
+            console.error(`Erro ao enviar mensagem para ${chatId}:`, err);
+            reject(err);
+        }
+    });
+};
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 app.post('/api/send', async (req, res) => {
     try {
         console.log('Recebendo requisição para enviar mensagem.');
@@ -217,63 +311,37 @@ app.post('/api/send', async (req, res) => {
         console.log('Destinatários:', recipientList);
         console.log('Mensagem:', message);
 
-        const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) => {
-            return new Promise(async (resolve, reject) => {
-                const timeoutId = setTimeout(() => {
-                    reject(new Error('Timeout ao enviar mensagem.'));
-                }, timeout);
-
-                try {
-                    if (file) {
-                        const filePath = path.join('/tmp', file.name);
-                        await file.mv(filePath);
-                        const media = MessageMedia.fromFilePath(filePath);
-                        await client.sendMessage(chatId, media, { caption: message });
-                        console.log(`Mensagem com anexo enviada para ${chatId}`);
-
-                        fs.unlink(filePath, (err) => {
-                            if (err) console.error(`Erro ao remover o arquivo: ${filePath}`, err);
-                        });
-                    } else {
-                        await client.sendMessage(chatId, message);
-                        console.log(`Mensagem enviada para ${chatId}`);
-                    }
-                    clearTimeout(timeoutId);
-                    resolve();
-                } catch (err) {
-                    clearTimeout(timeoutId);
-                    console.error(`Erro ao enviar mensagem para ${chatId}:`, err);
-                    reject(err);
-                }
-            });
-        };
-
         const chats = await client.getChats();
-		for (const recipient of recipientList) {
-			const recipientTrimmed = recipient.trim();
 
-			// Verifica se o destinatário é um número de celular
-			if (/^\+?\d+$/.test(recipientTrimmed)) {
-				let number = recipientTrimmed.replace(/\D/g, ''); // Remove todos os caracteres não numéricos
+        for (const recipient of recipientList) {
+            const recipientTrimmed = recipient.trim();
 
-				// Remove o nono dígito, caso seja um celular brasileiro com 11 dígitos (ex.: 55 + 11 + número com 9 dígitos)
-				if (number.startsWith("55") && number.length === 13) {
-					number = number.slice(0, 4) + number.slice(5); // Remove o nono dígito
-				}
-				
-				const chatId = number + "@c.us";
-				await sendMessageWithTimeout(chatId, message, file);
-			} else {
-				// Envia para grupos usando o nome exato do grupo
-				const group = chats.find(chat => chat.isGroup && chat.name === recipientTrimmed);
-				if (group) {
-					await sendMessageWithTimeout(group.id._serialized, message, file);
-				} else {
-					console.error(`Grupo ${recipientTrimmed} não encontrado.`);
-				}
-			}
-		}
-		
+            // Verifica se o destinatário é um número de celular
+            if (/^\+?\d+$/.test(recipientTrimmed)) {
+                let number = recipientTrimmed.replace(/\D/g, ''); // Remove todos os caracteres não numéricos
+
+                // Remove o nono dígito, caso seja um celular brasileiro com 11 dígitos (ex.: 55 + 11 + número com 9 dígitos)
+                if (number.startsWith("55") && number.length === 13) {
+                    number = number.slice(0, 4) + number.slice(5); // Remove o nono dígito
+                }
+                
+                const chatId = number + "@c.us";
+                await sendMessageWithTimeout(chatId, message, file);
+
+            } else {
+                // Envia para grupos usando o nome exato do grupo
+                const group = chats.find(chat => chat.isGroup && chat.name === recipientTrimmed);
+                if (group) {
+                    await sendMessageWithTimeout(group.id._serialized, message, file);
+                } else {
+                    console.error(`Grupo ${recipientTrimmed} não encontrado.`);
+                }
+            }
+
+            // Delay de 5 segundos entre os envios para evitar bloqueio
+            await delay(5000); // Delay de 5 segundos (pode ajustar conforme necessário)
+        }
+        
         res.status(200).json({ status: 'success', message: 'Mensagem enviada!' });
     } catch (err) {
         console.error('Erro ao processar o envio:', err);
@@ -301,9 +369,22 @@ app.get('/api/sendMessage/:recipient/:message', async (req, res) => {
         console.log('Destinatário:', recipientParam);
         console.log('Mensagem:', message);
 
+        // Função para tratar o número
+        function processPhoneNumber(number) {
+            // Remove espaços, parênteses, hifens e o símbolo +
+            number = number.replace(/[\s()+-]/g, '');
+
+            // Verifica se é um número brasileiro com nono dígito
+            if (number.startsWith('55') && number.length === 13) {
+                number = number.slice(0, 4) + number.slice(5); // Remove o nono dígito
+            }
+
+            return number;
+        }
+
         let chatId;
         if (/^\d+$/.test(recipientParam)) {
-            const number = recipientParam;
+            let number = processPhoneNumber(recipientParam); // Processa o número
             chatId = number + "@c.us";
         } else {
             const chats = await client.getChats();
