@@ -1,9 +1,11 @@
-
 services:
-  rr-whatsapp-api: 
+  rr-whatsapp-api:
+    restart: unless-stopped
     build:
-      context: .  
-      dockerfile: Dockerfile 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./index.js:/opt/RR-WhatsApp-API/index.js
     ports:
-      - "3001:3001" 
-      -  "8080:8080"  
+      - "${WEB_PORT}:3001"
+      - "${API_PORT}:8080"

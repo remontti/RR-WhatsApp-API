@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
 const QRCode = require('qrcode');
-const ipRangeCheck = require('ip-range-check'); 
+const ipRangeCheck = require('ip-range-check');
 
 const app = express();
 const port = 3001;
@@ -50,7 +50,7 @@ wss.on('connection', function connection(ws, req) {
     }
 });
 
-let client; 
+let client;
 
 function createClient() {
     client = new Client({
@@ -62,7 +62,7 @@ function createClient() {
             timeout: 0,
         },
     });
-    registerClientEvents(); 
+    registerClientEvents();
 }
 
 function registerClientEvents() {
@@ -117,41 +117,41 @@ function registerClientEvents() {
     client.on('loading_screen', (percent, message) => {
         console.log(`Carregando (${percent}%): ${message}`);
     });
-/*	
-    // Adicione este evento para autoresponder mensagens
+    /*	
+        // Adicione este evento para autoresponder mensagens
+        client.on('message', async (msg) => {
+            console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
+            
+            // Verifique se a mensagem é de texto
+            if (msg.type === 'chat') {
+                const response = `Olá, recebi sua mensagem: "${msg.body}". Vou te responder em breve.`;
+                await client.sendMessage(msg.from, response);
+                console.log(`Resposta automática enviada para ${msg.from}`);
+            }
+        });
+    */
+    // Adicione este evento para mensagem de testes
     client.on('message', async (msg) => {
         console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
-        
+
         // Verifique se a mensagem é de texto
-        if (msg.type === 'chat') {
-            const response = `Olá, recebi sua mensagem: "${msg.body}". Vou te responder em breve.`;
+        if (msg.type === 'chat' && msg.body.toLowerCase().trim() === '!ping') {
+            const response = 'PONG';
             await client.sendMessage(msg.from, response);
             console.log(`Resposta automática enviada para ${msg.from}`);
         }
     });
-*/	
-	// Adicione este evento para mensagem de testes
-	client.on('message', async (msg) => {
-		console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
-		
-		// Verifique se a mensagem é de texto
-		if (msg.type === 'chat' && msg.body.toLowerCase().trim() === '!ping') {
-			const response = 'PONG';
-			await client.sendMessage(msg.from, response);
-			console.log(`Resposta automática enviada para ${msg.from}`);
-		}
-	});
 
-	// Adicione este evento para recusar chamadas e responder
-	client.on('call', async (call) => {
-		console.log(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
+    // Adicione este evento para recusar chamadas e responder
+    client.on('call', async (call) => {
+        console.log(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
 
-			await call.reject();
-			console.log('Videochamada rejeitada.');
-			const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
-			await client.sendMessage(call.from, message);
-			console.log(`Mensagem automática enviada para ${call.from}`);
-	});
+        await call.reject();
+        console.log('Videochamada rejeitada.');
+        const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
+        await client.sendMessage(call.from, message);
+        console.log(`Mensagem automática enviada para ${call.from}`);
+    });
 
 }
 
@@ -238,7 +238,7 @@ const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) =>
         }, timeout);
 
         try {
-			// Verifica se a mensagem contém um link de imagem no formato [img = https://linkdaimagem]
+            // Verifica se a mensagem contém um link de imagem no formato [img = https://linkdaimagem]
             const imageRegex = /\[img\s*=\s*(https?:\/\/[^\s]+)\]/i;
             const pdfRegex = /\[pdf\s*=\s*(https?:\/\/[^\s]+)\]/i;  // Regex para detectar link de PDF
 
@@ -324,7 +324,7 @@ app.post('/api/send', async (req, res) => {
                 if (number.startsWith("55") && number.length === 13) {
                     number = number.slice(0, 4) + number.slice(5); // Remove o nono dígito
                 }
-                
+
                 const chatId = number + "@c.us";
                 await sendMessageWithTimeout(chatId, message, file);
 
@@ -341,7 +341,7 @@ app.post('/api/send', async (req, res) => {
             // Delay de 5 segundos entre os envios para evitar bloqueio
             await delay(5000); // Delay de 5 segundos (pode ajustar conforme necessário)
         }
-        
+
         res.status(200).json({ status: 'success', message: 'Mensagem enviada!' });
     } catch (err) {
         console.error('Erro ao processar o envio:', err);
