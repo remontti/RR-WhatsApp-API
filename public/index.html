@@ -36,7 +36,7 @@
 
                 <!-- Formulário de envio de mensagem e anexo -->
                 <h2>Enviar Mensagem</h2>
-                <form id="messageForm" action="/api/send" method="POST" enctype="multipart/form-data" class="mb-4">
+                <form id="messageForm" action="/api/send" method="POST" enctype="multipart/form-data" class="mb-4" accept-charset="UTF-8">
                     <div class="mb-3">
                         <label for="recipients" class="form-label">Número(s) ou Grupo(s) (separados por vírgula)</label>
                         <input type="text" id="recipients" name="recipients" class="form-control" placeholder="Ex: +5511912345678,+5511912345679,Grupo 1" required>
@@ -214,7 +214,7 @@ function showMessageModal(title, message, type) {
     var messageModal = new bootstrap.Modal(document.getElementById('messageModal'));
     messageModal.show();
 }
-
+/*
 // Mostrar QR Code no modal
 function showQrCode() {
     qrModalInstance = new bootstrap.Modal(document.getElementById('qrModal'));
@@ -231,6 +231,22 @@ function showQrCode() {
         qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQrCodeData)}`;
         qrCode.style.display = 'block';
     }
+}*/
+function showQrCode() {
+    const qrCode = document.getElementById('qrCode');
+    const loadingMessage = document.getElementById('loadingMessage');
+
+    loadingMessage.style.display = 'block';
+    qrCode.style.display = 'none';
+
+    if (lastQrCodeData) {
+        loadingMessage.style.display = 'none';
+        qrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(lastQrCodeData)}`;
+        qrCode.style.display = 'block';
+    }
+
+    qrModalInstance = new bootstrap.Modal(document.getElementById('qrModal'));
+    qrModalInstance.show();
 }
 
 // Desconectar do WhatsApp
