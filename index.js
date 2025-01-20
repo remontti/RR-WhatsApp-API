@@ -1,11 +1,13 @@
 const express = require('express');
 const fileUpload = require('express-fileupload');
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia, Buttons } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
 const WebSocket = require('ws');
 const QRCode = require('qrcode');
 const ipRangeCheck = require('ip-range-check'); 
+const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
 
 const app = express();
 const port = 3001;
@@ -14,7 +16,44 @@ const allowedIPs = [
     '192.168.0.0/16',
     '127.0.0.1',
     '::1',
+    '45.239.4.0/22',
+	'45.232.185.0/24',
+	'172.16.0.0/12',
+	'10.0.0.0/8',
 ];
+
+// Caminho para o diretório de logs
+const logsDir = path.join(__dirname, 'logs');
+
+// Verifica se o diretório de logs existe, caso contrário, cria-o
+if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true }); // `recursive` garante a criação de subdiretórios
+    console.log(`Diretório de logs criado em: ${logsDir}`);
+}
+
+// Configuração do logger
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp({
+            format: () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) // Ajuste o fuso horário conforme necessário
+        }),
+        winston.format.printf(({ timestamp, level, message }) => {
+            return `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+        })
+    ),
+    transports: [
+        new winston.transports.Console({
+            format: winston.format.colorize({ all: true }),
+        }),
+        new DailyRotateFile({
+            filename: path.join(logsDir, 'application-%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '20m',
+            maxFiles: '14d',
+        }),
+    ],
+});
 
 app.use((req, res, next) => {
     const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
@@ -40,12 +79,12 @@ wss.on('connection', function connection(ws, req) {
     const clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     const cleanedIP = clientIP.replace('::ffff:', '');
     if (ipRangeCheck(cleanedIP, allowedIPs)) {
-        console.log(`Cliente conectado via WebSocket: ${cleanedIP}`);
+        logger.info(`Cliente conectado via WebSocket: ${cleanedIP}`);
         if (qrCodeData) {
             ws.send(JSON.stringify({ type: 'qr', data: qrCodeData }));
         }
     } else {
-        console.log(`Conexão WebSocket negada para o IP: ${cleanedIP}`);
+        logger.info(`Conexão WebSocket negada para o IP: ${cleanedIP}`);
         ws.terminate();
     }
 });
@@ -69,7 +108,7 @@ function registerClientEvents() {
     client.removeAllListeners();
     client.on('qr', (qr) => {
         qrCodeData = qr;
-        console.log('QR Code gerado.');
+        logger.info('QR Code gerado.');
         wss.clients.forEach(function each(wsClient) {
             if (wsClient.readyState === WebSocket.OPEN) {
                 wsClient.send(JSON.stringify({ type: 'qr', data: qr }));
@@ -78,15 +117,15 @@ function registerClientEvents() {
     });
 
     client.on('authenticated', () => {
-        console.log('Cliente autenticado com sucesso.');
+        logger.info('Cliente autenticado com sucesso.');
     });
 
     client.on('ready', async () => {
-        console.log('WhatsApp está pronto!');
+        logger.info('WhatsApp está pronto!');
         qrCodeData = null;
         await new Promise(resolve => setTimeout(resolve, 5000));
         const info = await client.getState();
-        console.log('Estado do cliente:', info);
+        logger.info('Estado do cliente:', info);
         authenticated = true;
         wss.clients.forEach(function each(wsClient) {
             if (wsClient.readyState === WebSocket.OPEN) {
@@ -96,7 +135,7 @@ function registerClientEvents() {
     });
 
     client.on('disconnected', (reason) => {
-        console.log('Motivo da desconexão:', reason);
+        logger.info('Motivo da desconexão:', reason);
         authenticated = false;
         qrCodeData = null;
         wss.clients.forEach(function each(wsClient) {
@@ -107,50 +146,70 @@ function registerClientEvents() {
     });
 
     client.on('auth_failure', (msg) => {
-        console.error('Falha na autenticação:', msg);
+        logger.error('Falha na autenticação:', msg);
     });
 
     client.on('change_state', (state) => {
-        console.log('Estado de conexão mudou para:', state);
+        logger.info('Estado de conexão mudou para:', state);
     });
 
     client.on('loading_screen', (percent, message) => {
-        console.log(`Carregando (${percent}%): ${message}`);
+        logger.info(`Carregando (${percent}%): ${message}`);
     });
 /*	
     // Adicione este evento para autoresponder mensagens
     client.on('message', async (msg) => {
-        console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
+        logger.info(`Mensagem recebida de ${msg.from}: ${msg.body}`);
         
         // Verifique se a mensagem é de texto
         if (msg.type === 'chat') {
             const response = `Olá, recebi sua mensagem: "${msg.body}". Vou te responder em breve.`;
             await client.sendMessage(msg.from, response);
-            console.log(`Resposta automática enviada para ${msg.from}`);
+            logger.info(`Resposta automática enviada para ${msg.from}`);
         }
     });
 */	
+
 	// Adicione este evento para mensagem de testes
 	client.on('message', async (msg) => {
-		console.log(`Mensagem recebida de ${msg.from}: ${msg.body}`);
-		
-		// Verifique se a mensagem é de texto
+		// Verifica se a mensagem é de "status@broadcast" e a ignora
+		if (msg.from === 'status@broadcast') {
+			//logger.info('Mensagem de status ignorada.');
+			return; // Sai do evento sem processar a mensagem
+		}
+
+		logger.info(`Mensagem recebida de ${msg.from}: ${msg.body}`);
+
+		// Verifica se a mensagem é de texto e o comando "!ping"
 		if (msg.type === 'chat' && msg.body.toLowerCase().trim() === '!ping') {
 			const response = 'PONG';
 			await client.sendMessage(msg.from, response);
-			console.log(`Resposta automática enviada para ${msg.from}`);
+			logger.info(`Resposta automática enviada para ${msg.from}`);
+		} else if (msg.type === 'chat' || msg.type === 'image' || msg.type === 'video' || msg.type === 'ptt') {
+			// Carregar a imagem
+			const media = MessageMedia.fromFilePath('novo.jpg'); // Substitua com o caminho da sua imagem
+
+			// Enviar mensagem de texto e a imagem
+			await client.sendMessage(msg.from, media, { 
+				caption: '\n*Olá! Esse número está sendo desativado!*\n\nPedimos que a partir de agora sempre que precisar falar conosco use o número *(75)3199-0577*.\n\nEXCLUA ESSE NÚMERO DA SUA AGENDA E SALVE O *(75)3199-0577*\n\nAtt. *Alagoinhas Telecom*' 
+			});
+			
+			logger.info(`Resposta automática com imagem enviada para ${msg.from}`);
 		}
 	});
 
 	// Adicione este evento para recusar chamadas e responder
 	client.on('call', async (call) => {
-		console.log(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
+		logger.info(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
 
 			await call.reject();
-			console.log('Videochamada rejeitada.');
-			const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
-			await client.sendMessage(call.from, message);
-			console.log(`Mensagem automática enviada para ${call.from}`);
+			logger.info(`Chamada de ${call.isVideo ? 'Vídeo' : 'Voz'} rejeitada.`);
+			// Carregar a imagem
+			const media = MessageMedia.fromFilePath('novo.jpg');
+			//const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
+			//await client.sendMessage(call.from, message);
+			await client.sendMessage(call.from, media, { caption: '\n*Olá! Esse número está sendo desativado!*\n\nPedimos que a partir de agora sempre que precisar falar conosco use o número *(75)3199-0577*.\n\nAtt. Alagoinhas Telecom' });
+			logger.info(`Mensagem automática enviada para ${call.from}`);
 	});
 
 }
@@ -178,7 +237,7 @@ app.get('/api/qr', async (req, res) => {
                 });
                 res.end(imgBuffer);
             } catch (err) {
-                console.error('Erro ao gerar QR Code:', err);
+                logger.error('Erro ao gerar QR Code:', err);
                 res.status(500).json({ status: 'error', message: 'Erro ao gerar QR Code' });
             }
         } else {
@@ -189,12 +248,12 @@ app.get('/api/qr', async (req, res) => {
 
 app.get('/api/disconnect', async (req, res) => {
     try {
-        console.log('Iniciando logout...');
+        logger.info('Iniciando logout...');
         await client.logout();
-        console.log('Logout concluído.');
-        console.log('Destruindo o cliente...');
+        logger.info('Logout concluído.');
+        logger.info('Destruindo o cliente...');
         await client.destroy();
-        console.log('Cliente destruído.');
+        logger.info('Cliente destruído.');
 
         client = null;
         qrCodeData = null;
@@ -203,17 +262,17 @@ app.get('/api/disconnect', async (req, res) => {
         const sessionPath = path.join(__dirname, 'session');
         if (fs.existsSync(sessionPath)) {
             fs.rmSync(sessionPath, { recursive: true, force: true });
-            console.log('Dados de autenticação removidos.');
+            logger.info('Dados de autenticação removidos.');
         }
 
-        console.log('Criando novo cliente...');
+        logger.info('Criando novo cliente...');
         createClient();
-        console.log('Inicializando novo cliente...');
+        logger.info('Inicializando novo cliente...');
         client.initialize();
 
         res.send('Desconectado com sucesso!');
     } catch (err) {
-        console.error('Erro ao desconectar:', err);
+        logger.error('Erro ao desconectar:', err);
         res.status(500).json({ status: 'error', message: 'Erro ao desconectar.', error: err });
     }
 });
@@ -249,7 +308,7 @@ const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) =>
 
                 // Envia a imagem
                 await client.sendMessage(chatId, media, { caption: message.replace(imageRegex, '') });
-                console.log(`Imagem com a mensagem enviada para ${chatId}`);
+                logger.info(`Imagem com a mensagem enviada para ${chatId}`);
             } else {
                 match = message.match(pdfRegex);  // Verifica se é um link de PDF
                 if (match) {
@@ -258,7 +317,7 @@ const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) =>
 
                     // Envia o PDF
                     await client.sendMessage(chatId, media, { caption: message.replace(pdfRegex, '') });
-                    console.log(`PDF com a mensagem enviado para ${chatId}`);
+                    logger.info(`PDF com a mensagem enviado para ${chatId}`);
                 } else {
                     // Caso não haja imagem ou PDF, apenas envia a mensagem de texto
                     if (file) {
@@ -266,13 +325,13 @@ const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) =>
                         await file.mv(filePath);
                         const media = MessageMedia.fromFilePath(filePath);
                         await client.sendMessage(chatId, media, { caption: message });
-                        console.log(`Mensagem com anexo enviada para ${chatId}`);
+                        logger.info(`Mensagem com anexo enviada para ${chatId}`);
                         fs.unlink(filePath, (err) => {
-                            if (err) console.error(`Erro ao remover o arquivo: ${filePath}`, err);
+                            if (err) logger.error(`Erro ao remover o arquivo: ${filePath}`, err);
                         });
                     } else {
                         await client.sendMessage(chatId, message);
-                        console.log(`Mensagem enviada para ${chatId}`);
+                        logger.info(`Mensagem enviada para ${chatId}`);
                     }
                 }
             }
@@ -281,7 +340,7 @@ const sendMessageWithTimeout = async (chatId, message, file, timeout = 20000) =>
             resolve();
         } catch (err) {
             clearTimeout(timeoutId);
-            console.error(`Erro ao enviar mensagem para ${chatId}:`, err);
+            logger.error(`Erro ao enviar mensagem para ${chatId}:`, err);
             reject(err);
         }
     });
@@ -291,16 +350,16 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 app.post('/api/send', async (req, res) => {
     try {
-        console.log('Recebendo requisição para enviar mensagem.');
+        logger.info('Recebendo requisição para enviar mensagem.');
         if (!client || !client.info || !authenticated) {
-            console.log('Cliente não está pronto.');
+            logger.info('Cliente não está pronto.');
             return res.status(500).json({ status: 'error', message: 'Cliente não está pronto. Por favor, tente novamente mais tarde.' });
         }
 
         const clientState = await client.getState();
-        console.log('Estado atual do cliente:', clientState);
+        logger.info('Estado atual do cliente:', clientState);
         if (clientState !== 'CONNECTED') {
-            console.log('Cliente não está conectado.');
+            logger.info('Cliente não está conectado.');
             return res.status(500).json({ status: 'error', message: 'Cliente não está conectado ao WhatsApp. Por favor, aguarde.' });
         }
 
@@ -308,8 +367,8 @@ app.post('/api/send', async (req, res) => {
         const recipientList = recipients.split(',');
         const file = req.files ? req.files.file : null;
 
-        console.log('Destinatários:', recipientList);
-        console.log('Mensagem:', message);
+        logger.info('Destinatários:', recipientList);
+        logger.info('Mensagem:', message);
 
         const chats = await client.getChats();
 
@@ -334,7 +393,7 @@ app.post('/api/send', async (req, res) => {
                 if (group) {
                     await sendMessageWithTimeout(group.id._serialized, message, file);
                 } else {
-                    console.error(`Grupo ${recipientTrimmed} não encontrado.`);
+                    logger.error(`Grupo ${recipientTrimmed} não encontrado.`);
                 }
             }
 
@@ -344,30 +403,30 @@ app.post('/api/send', async (req, res) => {
         
         res.status(200).json({ status: 'success', message: 'Mensagem enviada!' });
     } catch (err) {
-        console.error('Erro ao processar o envio:', err);
+        logger.error('Erro ao processar o envio:', err);
         res.status(500).json({ status: 'error', message: 'Erro ao processar o envio.', error: err.message });
     }
 });
 
 app.get('/api/sendMessage/:recipient/:message', async (req, res) => {
     try {
-        console.log('Recebendo requisição para enviar mensagem via GET.');
+        logger.info('Recebendo requisição para enviar mensagem via GET.');
         if (!client || !client.info || !authenticated) {
-            console.log('Cliente não está pronto.');
+            logger.info('Cliente não está pronto.');
             return res.status(500).json({ status: 'error', message: 'Cliente não está pronto. Por favor, tente novamente mais tarde.' });
         }
 
         const clientState = await client.getState();
-        console.log('Estado atual do cliente:', clientState);
+        logger.info('Estado atual do cliente:', clientState);
         if (clientState !== 'CONNECTED') {
-            console.log('Cliente não está conectado.');
+            logger.info('Cliente não está conectado.');
             return res.status(500).json({ status: 'error', message: 'Cliente não está conectado ao WhatsApp. Por favor, aguarde.' });
         }
 
         const recipientParam = req.params.recipient;
         const message = decodeURIComponent(req.params.message);
-        console.log('Destinatário:', recipientParam);
-        console.log('Mensagem:', message);
+        logger.info('Destinatário:', recipientParam);
+        logger.info('Mensagem:', message);
 
         // Função para tratar o número
         function processPhoneNumber(number) {
@@ -392,20 +451,20 @@ app.get('/api/sendMessage/:recipient/:message', async (req, res) => {
             if (group) {
                 chatId = group.id._serialized;
             } else {
-                console.error(`Grupo "${recipientParam}" não encontrado.`);
+                logger.error(`Grupo "${recipientParam}" não encontrado.`);
                 return res.status(404).json({ status: 'error', message: `Grupo "${recipientParam}" não encontrado.` });
             }
         }
 
         await client.sendMessage(chatId, message);
-        console.log(`Mensagem enviada para ${chatId}`);
+        logger.info(`Mensagem enviada para ${chatId}`);
         res.status(200).json({ status: 'success', message: 'Mensagem enviada!' });
     } catch (err) {
-        console.error('Erro ao enviar mensagem via GET:', err);
+        logger.error('Erro ao enviar mensagem via GET:', err);
         res.status(500).json({ status: 'error', message: 'Erro ao enviar mensagem.', error: err.message });
     }
 });
 
 app.listen(port, () => {
-    console.log(`API rodando na porta ${port}`);
+    logger.info(`API rodando na porta ${port}`);
 });
