@@ -152,61 +152,28 @@ function registerClientEvents() {
     client.on('loading_screen', (percent, message) => {
         logger.info(`Carregando (${percent}%): ${message}`);
     });
-/*	
-    // Adicione este evento para autoresponder mensagens
+	
+    // Adicione este evento para mensagem de testes
     client.on('message', async (msg) => {
         logger.info(`Mensagem recebida de ${msg.from}: ${msg.body}`);
-        
+
         // Verifique se a mensagem é de texto
-        if (msg.type === 'chat') {
-            const response = `Olá, recebi sua mensagem: "${msg.body}". Vou te responder em breve.`;
+        if (msg.type === 'chat' && msg.body.toLowerCase().trim() === '!ping') {
+            const response = 'PONG';
             await client.sendMessage(msg.from, response);
             logger.info(`Resposta automática enviada para ${msg.from}`);
         }
     });
-*/	
+    // Adicione este evento para recusar chamadas e responder
+    client.on('call', async (call) => {
+        logger.info(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
 
-	// Adicione este evento para mensagem de testes
-	client.on('message', async (msg) => {
-		// Verifica se a mensagem é de "status@broadcast" e a ignora
-		if (msg.from === 'status@broadcast') {
-			//logger.info('Mensagem de status ignorada.');
-			return; // Sai do evento sem processar a mensagem
-		}
-
-		logger.info(`Mensagem recebida de ${msg.from}: ${msg.body}`);
-
-		// Verifica se a mensagem é de texto e o comando "!ping"
-		if (msg.type === 'chat' && msg.body.toLowerCase().trim() === '!ping') {
-			const response = 'PONG';
-			await client.sendMessage(msg.from, response);
-			logger.info(`Resposta automática enviada para ${msg.from}`);
-		} else if (msg.type === 'chat' || msg.type === 'image' || msg.type === 'video' || msg.type === 'ptt') {
-			// Carregar a imagem
-			const media = MessageMedia.fromFilePath('novo.jpg'); // Substitua com o caminho da sua imagem
-
-			// Enviar mensagem de texto e a imagem
-			await client.sendMessage(msg.from, media, { 
-				caption: '\n*Olá! Esse número está sendo desativado!*\n\nPedimos que a partir de agora sempre que precisar falar conosco use o número *(75)3199-0577*.\n\nEXCLUA ESSE NÚMERO DA SUA AGENDA E SALVE O *(75)3199-0577*\n\nAtt. *Alagoinhas Telecom*' 
-			});
-			
-			logger.info(`Resposta automática com imagem enviada para ${msg.from}`);
-		}
-	});
-
-	// Adicione este evento para recusar chamadas e responder
-	client.on('call', async (call) => {
-		logger.info(`Recebida uma chamada de ${call.from} (Tipo: ${call.isVideo ? 'Vídeo' : 'Voz'})`);
-
-			await call.reject();
-			logger.info(`Chamada de ${call.isVideo ? 'Vídeo' : 'Voz'} rejeitada.`);
-			// Carregar a imagem
-			const media = MessageMedia.fromFilePath('novo.jpg');
-			//const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
-			//await client.sendMessage(call.from, message);
-			await client.sendMessage(call.from, media, { caption: '\n*Olá! Esse número está sendo desativado!*\n\nPedimos que a partir de agora sempre que precisar falar conosco use o número *(75)3199-0577*.\n\nAtt. Alagoinhas Telecom' });
-			logger.info(`Mensagem automática enviada para ${call.from}`);
-	});
+        await call.reject();
+        logger.info(`Chamada de ${call.isVideo ? 'Vídeo' : 'Voz'} rejeitada.`);
+        const message = '*Mensagem automática!*\n\nEste número não aceita chamadas de voz ou de vídeo.';
+        await client.sendMessage(call.from, message);
+        logger.info(`Mensagem automática enviada para ${call.from}`);
+    });
 
 }
 
